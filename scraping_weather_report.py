@@ -28,10 +28,10 @@ for row in tbody.find_elements_by_class_name('calendar-list-cl-tr'):
     cell_list = row.find_elements_by_tag_name('td')
 
     temperature = cell_list[0].text.replace('°', '').split('/')
-    df.loc[i, 'max_temper'] = temperature[0]  # 공시대상회사(종목명)
-    df.loc[i, 'min_temper'] = temperature[1]  # 공시대상회사(종목명)
-    df.loc[i, 'rainfall'] = cell_list[1].text.split()[0]  # 공시대상회사(종목명)
-    df.loc[i, 'snow_depth'] = cell_list[2].text.split()[0]  # 공시대상회사(종목명)
+    df.loc[i, 'max_temper'] = temperature[0]
+    df.loc[i, 'min_temper'] = temperature[1]
+    df.loc[i, 'rainfall'] = cell_list[1].text.split()[0]
+    df.loc[i, 'snow_depth'] = cell_list[2].text.split()[0]
 
     i += 1
 
