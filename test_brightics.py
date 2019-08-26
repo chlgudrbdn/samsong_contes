@@ -71,13 +71,13 @@ weather_after_crawling = pd.read_csv('weather_2019_08_11.csv')
 customer = pd.concat([customer, customer0525_0731], axis=0)
 # print(customer.shape)
 customer = customer.drop_duplicates()
-# print(customer.shape)
+print(customer.shape)
 del customer0525_0731
 
 ##### 구매 데이터(일자, 고객) #####
 # print(meal.shape)
 meal = pd.concat([meal, meal_0525_0731], axis=0)
-# print(meal.shape)
+print(meal.shape)
 print("동일인이 두번 이상 구매했는데 quantity에 2가 아닌 경우 ", meal[meal.duplicated(keep=False)].shape)  # 중복 확인
 print("전체 비중을 생각해보면 ", meal[meal.duplicated(keep=False)].shape[0]/meal.shape[0])
 print('고로 생략')
@@ -111,7 +111,7 @@ meal.loc[meal.BRAND == '탕맛기픈', 'BRAND'] = "DeepSoup"
 ##### 날씨 데이터(일자) #####
 # print(weather_log.shape)
 weather_log = pd.concat([weather_log, weather_after_crawling], axis=0)
-# print(weather_log.shape)
+print(weather_log.shape)
 del weather_after_crawling
 
 ##### 손님 정보와 구매정보를 매칭 #####
@@ -135,6 +135,7 @@ print(len(cust_meal.CUSTOMER_ID.unique()), '에서')
 print(len(major_cust_list), '으로 변함. 3392명 정도가 사라진 셈.')
 # print(7402*(31+11-1-9-3))  # 8월1일부터 9월 11까지 예측대상 일수는 29일. 예상대로라면 여기에 7402명의 사람들의 반응, 214658이 들어가야 한다.
 major_cust = pd.DataFrame(data=cust_meal['CUSTOMER_ID'].unique(), columns=['CUSTOMER_ID'])
+print(major_cust.shape)
 # print(len(major_cust_list))
 # print(cust_meal.shape)
 # cust_meal = cust_meal[cust_meal['CUSTOMER_ID'].isin(major_cust_list)]
@@ -145,7 +146,7 @@ del major_cust_list
 really_eating_date_at_train = filter_sat_sun_day_and_attach_weekday(cust_meal, 'SELL_DATE')
 really_eating_date_at_train = pd.DataFrame(data=really_eating_date_at_train['SELL_DATE'].unique(),
                                            columns=['SELL_DATE'])
-
+print(really_eating_date_at_train.shape)
 # really_eating_date_at_train.drop(['key'], axis=1, inplace=True)
 # major_cust.drop(['key'], axis=1, inplace=True)
 
@@ -153,19 +154,25 @@ really_eating_date_at_train['SELL_DATE'] = really_eating_date_at_train.SELL_DATE
 major_cust['CUSTOMER_ID'] = major_cust.CUSTOMER_ID.astype("category")
 
 date_cust = cross_join(really_eating_date_at_train, major_cust)
+print(date_cust.shape)
+del really_eating_date_at_train
 date_cust.rename(columns={"SELL_DATE": "date"}, inplace=True)
 date_cust_weather = date_cust.merge(weather_log, how='left', on='date')
+print(date_cust_weather.dtypes)
+print(date_cust_weather.shape)
 print(date_cust_weather.isna().sum())
 # print(date_cust_weather.dtypes)
 date_cust_weather = date_cust_weather.merge(customer, how='left', on='CUSTOMER_ID')
+print(date_cust_weather.shape)
 
 meal.rename(columns={'SELL_DATE': "date"}, inplace=True)
 date_cust_weather_meal = pd.merge(date_cust_weather, meal, how='left', on=['date', 'CUSTOMER_ID'])  # 이 과정에서 같은 걸 두번 산 사람은 한번만 매칭되버리는데 그냥 무시한다.
+print(date_cust_weather_meal.shape)
 date_cust_weather_meal['BRAND'].fillna(value='none', inplace=True)
 print(date_cust_weather_meal.isna().sum())
 del date_cust
 del date_cust_weather
-
+del meal
 
 ###### test table ######
 test_table = cross_join(weather_log, major_cust)
@@ -222,8 +229,7 @@ print(len(test_table_addonehot.columns))
 date_cust_weather_meal = filter_sat_sun_day_and_attach_weekday(date_cust_weather_meal, 'date')
 date_cust_weather_meal = extract_DerivedVariable_from_date(date_cust_weather_meal)
 
-
-date_cust_weather_meal.drop(['date'], axis=1, inplace=True)
+# date_cust_weather_meal.drop(['date'], axis=1, inplace=True)  # train, validation 데이터셋으로 나누기 위함.
 date_cust_weather_meal.CUSTOMER_ID = date_cust_weather_meal.CUSTOMER_ID.astype("category")
 date_cust_weather_meal.max_temper = date_cust_weather_meal.max_temper.astype("float32")
 date_cust_weather_meal.min_temper = date_cust_weather_meal.min_temper.astype("float32")
@@ -267,21 +273,29 @@ print(date_cust_weather_meal.info())
 # korean_age     사용
 # month_day      onehot으로 바꿔야할것.
 
-date_cust_weather_meal_addonehot = add_one_hot_encoding(date_cust_weather_meal, 'GENDER')
-date_cust_weather_meal_addonehot = add_one_hot_encoding(date_cust_weather_meal_addonehot, 'month_day')
-date_cust_weather_meal_addonehot = add_one_hot_encoding(date_cust_weather_meal_addonehot, 'weekday')
-date_cust_weather_meal_addonehot = add_one_hot_encoding(date_cust_weather_meal_addonehot, 'month')
-date_cust_weather_meal_addonehot = add_one_hot_encoding(date_cust_weather_meal_addonehot, 'CUSTOMER_ID')
+train_table = date_cust_weather_meal[date_cust_weather_meal['date'] < '2019-01-01']
+print(train_table.shape)
+valid_table = date_cust_weather_meal[date_cust_weather_meal['date'] >= '2019-01-01']
+print(valid_table.shape)
 
-print(date_cust_weather_meal_addonehot.info())
+train_table = add_one_hot_encoding(train_table, 'GENDER')
+train_table = add_one_hot_encoding(train_table, 'month_day')
+train_table = add_one_hot_encoding(train_table, 'weekday')
+train_table = add_one_hot_encoding(train_table, 'month')
+train_table = add_one_hot_encoding(train_table, 'CUSTOMER_ID')
+
+valid_table = add_one_hot_encoding(valid_table, 'GENDER')
+valid_table = add_one_hot_encoding(valid_table, 'month_day')
+valid_table = add_one_hot_encoding(valid_table, 'weekday')
+valid_table = add_one_hot_encoding(valid_table, 'month')
+valid_table = add_one_hot_encoding(valid_table, 'CUSTOMER_ID')
+
+print(train_table.info())
+print(valid_table.info())
 
 #onehot_encoder = OneHotEncoder(sparse=True)
 #label_encoder = LabelEncoder(sparse=True)
 
-train_table = date_cust_weather_meal_addonehot[date_cust_weather_meal_addonehot['date'] < '2019-01-01']
-print(train_table.shape)
-valid_table = date_cust_weather_meal_addonehot[date_cust_weather_meal_addonehot['date'] >= '2019-01-01']
-print(valid_table.shape)
 
 """
 scaler = MinMaxScaler()
