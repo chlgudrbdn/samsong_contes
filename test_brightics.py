@@ -35,6 +35,18 @@ def add_one_hot_encoding(df, col):
     return df
 
 
+def add_label_encoding(df, col):
+    encoder = LabelEncoder()
+    encoder.fit(df[col])
+    encoded_Y = encoder.transform(df[col])
+    print(encoded_Y)
+    encoded_Y = pd.DataFrame(data=encoded_Y, columns=[col])
+    print(encoded_Y.head())
+    df.drop([col], axis=1, inplace=True)
+    df = pd.concat([df, encoded_Y], axis=1)
+    return df
+
+
 def change_scale_to_minmax(df, col):
     scaler = MinMaxScaler()
     df[col] = scaler.fit_transform(df['col'])
@@ -58,9 +70,11 @@ def extract_DerivedVariable_from_date(df):  # 한국식 나이까지 계산하�
 
 customer = pd.read_csv('mealData_customer.csv')
 customer0525_0731 = pd.read_csv('mealData_customer_0525_0731.csv')
+# customer['CUSTOMER_ID'] = customer.CUSTOMER_ID.astype("category")
 
 meal = pd.read_csv('mealData_meal.csv')
 meal_0525_0731 = pd.read_csv('mealData_meal_0525_0731.csv')
+# meal['CUSTOMER_ID'] = meal.CUSTOMER_ID.astype("category")  # 다른 결과 값이 나온다.
 
 weather_log = pd.read_csv('20190811171205_weather_log.csv')
 weather_after_crawling = pd.read_csv('weather_2019_08_11.csv')
@@ -68,6 +82,7 @@ weather_after_crawling = pd.read_csv('weather_2019_08_11.csv')
 ### 크게 3종의 데이터셋을 합해야한다. 그 순서는 중요함.
 ##### 고객 데이터(고객) #####
 # print(customer.shape)
+# print(customer0525_0731.shape)
 customer = pd.concat([customer, customer0525_0731], axis=0)
 # print(customer.shape)
 customer = customer.drop_duplicates()
@@ -81,7 +96,8 @@ print(meal.shape)
 print("동일인이 두번 이상 구매했는데 quantity에 2가 아닌 경우 ", meal[meal.duplicated(keep=False)].shape)  # 중복 확인
 print("전체 비중을 생각해보면 ", meal[meal.duplicated(keep=False)].shape[0]/meal.shape[0])
 print('고로 생략')
-# meal = meal.drop_duplicates()  # 한 사람이 같은 메뉴를 다른사람에게 사주느라고 이런 거 같은데 2번 산걸로 카운팅이 되지 않음. 일단 선호가 높다고 간주하고 빈도를 높이는 것으로 감.
+meal = meal.drop_duplicates()  # 한 사람이 같은 메뉴를 다른사람에게 사주느라고 이런 거 같은데 2번 산걸로 카운팅이 되지 않음. 일단 선호가 높다고 간주하고 빈도를 높이는 것으로 감.
+# 10032건
 # print(meal.shape)
 del meal_0525_0731
 # 'Chef`sCounter' : "Chef's Counter"
@@ -108,6 +124,7 @@ meal.loc[meal.BRAND == '아시안픽스', 'BRAND'] = "AsianPicks"
 meal.loc[meal.BRAND == '우리미각면', 'BRAND'] = "AsianNoodle"
 meal.loc[meal.BRAND == '탕맛기픈', 'BRAND'] = "DeepSoup"
 
+
 ##### 날씨 데이터(일자) #####
 # print(weather_log.shape)
 weather_log = pd.concat([weather_log, weather_after_crawling], axis=0)
@@ -117,7 +134,7 @@ del weather_after_crawling
 ##### 손님 정보와 구매정보를 매칭 #####
 cust_meal = pd.merge(meal, customer, on='CUSTOMER_ID')
 # cust_meal_outer = pd.merge(meal, customer, how='outer', on='CUSTOMER_ID')
-# print(cust_meal.shape)
+print(cust_meal.shape)
 # print(cust_meal.isna().sum())
 # print(cust_meal_outer.shape)
 # print(cust_meal_outer.isna().sum())
@@ -132,7 +149,7 @@ cust_meal = pd.merge(meal, customer, on='CUSTOMER_ID')
 major_cust_list = meal[meal['SELL_DATE'] > '2019-05-01'].sort_values(['SELL_DATE'], ascending=[True])
 major_cust_list = list(major_cust_list['CUSTOMER_ID'].unique())
 print(len(cust_meal.CUSTOMER_ID.unique()), '에서')
-print(len(major_cust_list), '으로 변함. 3392명 정도가 사라진 셈.')
+print(len(major_cust_list), '으로 변함. ',len(cust_meal.CUSTOMER_ID.unique())-len(major_cust_list),'명 정도가 사라진 셈.')
 # print(7402*(31+11-1-9-3))  # 8월1일부터 9월 11까지 예측대상 일수는 29일. 예상대로라면 여기에 7402명의 사람들의 반응, 214658이 들어가야 한다.
 major_cust = pd.DataFrame(data=cust_meal['CUSTOMER_ID'].unique(), columns=['CUSTOMER_ID'])
 print(major_cust.shape)
@@ -150,10 +167,10 @@ print(really_eating_date_at_train.shape)
 # really_eating_date_at_train.drop(['key'], axis=1, inplace=True)
 # major_cust.drop(['key'], axis=1, inplace=True)
 
-really_eating_date_at_train['SELL_DATE'] = really_eating_date_at_train.SELL_DATE.astype("category")
-major_cust['CUSTOMER_ID'] = major_cust.CUSTOMER_ID.astype("category")
+# really_eating_date_at_train['SELL_DATE'] = really_eating_date_at_train.SELL_DATE.astype("category")
+# major_cust['CUSTOMER_ID'] = major_cust.CUSTOMER_ID.astype("category")
 
-date_cust = cross_join(really_eating_date_at_train, major_cust)
+date_cust = cross_join(really_eating_date_at_train, major_cust)  # 389*10794=4198866 경우의 수는 이것이고 나머지는 변치 않는 것이 맞다.
 print(date_cust.shape)
 del really_eating_date_at_train
 date_cust.rename(columns={"SELL_DATE": "date"}, inplace=True)
@@ -166,12 +183,12 @@ date_cust_weather = date_cust_weather.merge(customer, how='left', on='CUSTOMER_I
 print(date_cust_weather.shape)
 
 meal.rename(columns={'SELL_DATE': "date"}, inplace=True)
-date_cust_weather_meal = pd.merge(date_cust_weather, meal, how='left', on=['date', 'CUSTOMER_ID'])  # 이 과정에서 같은 걸 두번 산 사람은 한번만 매칭되버리는데 그냥 무시한다.
+date_cust_weather_meal = pd.merge(date_cust_weather, meal, how='left', on=['date', 'CUSTOMER_ID'])  # 이 과정에서 같은 걸 두번 산 사람은 한번만 매칭되는게 아니라 반복해서 매칭되므로 사전에 지워야하는 것으로 보임..
 print(date_cust_weather_meal.shape)
 date_cust_weather_meal['BRAND'].fillna(value='none', inplace=True)
 print(date_cust_weather_meal.isna().sum())
-del date_cust
-del date_cust_weather
+# del date_cust
+# del date_cust_weather
 del meal
 
 ###### test table ######
@@ -278,6 +295,8 @@ print(train_table.shape)
 valid_table = date_cust_weather_meal[date_cust_weather_meal['date'] >= '2019-01-01']
 print(valid_table.shape)
 
+train_table = add_label_encoding(train_table, 'GENDER')
+
 train_table = add_one_hot_encoding(train_table, 'GENDER')
 train_table = add_one_hot_encoding(train_table, 'month_day')
 train_table = add_one_hot_encoding(train_table, 'weekday')
@@ -307,4 +326,74 @@ dataset = sparse.csr_matrix(onehot_encoder.fit_transform(customer['CUSTOMER_ID']
 for i in range(customer.ix[:, 1:].shape[1]):  # tf-idf matrix 앞에다 열 하나씩 붙이는데 거꾸로 붙이는 거라 뒤에서 붙어 붙였다. 그래서 -i
     dataset = np.insert(dataset, 1, customer.ix[:, -i].values, axis=1)
 
+"""
+
+
+""" backup code
+import pandas as pd
+df = inputs[0]
+# date           실제론 기계학습에선 안씀. 결과 뱉을 때 쓸 것. test table에겐 쓸모 있음.
+# CUSTOMER_ID    onehot으로 바꿔야할것.
+# max_temper     사용
+# min_temper     사용
+# rainfall       사용
+# snow_depth     사용
+# GENDER         onehot으로 바꿔야할것.
+
+# weekday        onehot으로 바꿔야할것.
+# month          onehot으로 바꿔야할것.
+# korean_age     사용
+# month_day      onehot으로 바꿔야할것.
+
+# CUSTOMER_ID_left는 컬럼명 충돌 대비해 나중에 처리
+df.CUSTOMER_ID = df.CUSTOMER_ID.astype("category")
+# date_left는 컬럼명 충돌 대비해 나중에 처리
+df.drop(['date_right'], axis=1, inplace=True)
+df.max_temper = df.max_temper.astype("float32")
+df.min_temper = df.min_temper.astype("float32")
+df.rainfall = df.rainfall.astype("float32")
+df.snow_depth = df.snow_depth.astype("float32")
+df.drop(['CUSTOMER_ID_right'], axis=1, inplace=True)
+df.GENDER = df.GENDER.astype("category")
+df.drop(['date'], axis=1, inplace=True)
+df.rename(columns={"date_left": "date"}, inplace=True) #
+df.drop(['CUSTOMER_ID'], axis=1, inplace=True)
+df.rename(columns={"CUSTOMER_ID_left": "CUSTOMER_ID"}, inplace=True) # 
+df.BRAND = df.BRAND.astype("category")
+#df.drop(['MENU'], axis=1, inplace=True)
+#df.drop(['PRICE'], axis=1, inplace=True)
+#df.drop(['QUANTITY'], axis=1, inplace=True)
+df.weekday = df.weekday.astype("int8")
+df.month = df.month.astype("int8")
+df.korean_age = df.korean_age.astype("int8")
+df.month_day = df.month_day.astype("category")
+
+
+
+
+date_cust_weather_meal = df
+
+def add_one_hot_encoding(df, col):
+    onehot = pd.get_dummies(df[col], sparse=True)
+    # print(onehot.head())
+    df.drop([col], axis=1, inplace=True)
+    df = pd.concat([df, onehot], axis=1)
+    return df
+  
+train_table = date_cust_weather_meal[date_cust_weather_meal['date'] < '2019-01-01']
+print(train_table.shape)
+valid_table = date_cust_weather_meal[date_cust_weather_meal['date'] >= '2019-01-01']
+print(valid_table.shape)
+
+train_table = add_one_hot_encoding(train_table, 'GENDER')
+train_table = add_one_hot_encoding(train_table, 'month_day')
+train_table = add_one_hot_encoding(train_table, 'weekday')
+train_table = add_one_hot_encoding(train_table, 'month')
+train_table = add_one_hot_encoding(train_table, 'CUSTOMER_ID')
+
+valid_table = add_one_hot_encoding(valid_table, 'GENDER')
+valid_table = add_one_hot_encoding(valid_table, 'month_day')
+valid_table = add_one_hot_encoding(valid_table, 'weekday')
+valid_table = add_one_hot_encoding(valid_table, 'month')
+valid_table = add_one_hot_encoding(valid_table, 'CUSTOMER_ID')
 """
